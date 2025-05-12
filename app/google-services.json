@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "556584445209",
+    "project_id": "edutech-db593",
+    "storage_bucket": "edutech-db593.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:556584445209:android:be05fde65e549cc7d01188",
+        "android_client_info": {
+          "package_name": "com.example.edutech"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAzAjXVQmbb7lknxIk9QaUxbcjB4gsRKmA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
