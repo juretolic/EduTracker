@@ -12,7 +12,20 @@
           "package_name": "com.example.edutech"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "556584445209-of6e35ovdohhqjjvv5ubos67bv87f9ht.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.edutech",
+            "certificate_hash": "38aea4fd2d2eca57d1ec3a0c56444967c6e0c591"
+          }
+        },
+        {
+          "client_id": "556584445209-q7pqpidl88s0ltvqjb66r6behs0fvp17.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAzAjXVQmbb7lknxIk9QaUxbcjB4gsRKmA"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "556584445209-q7pqpidl88s0ltvqjb66r6behs0fvp17.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

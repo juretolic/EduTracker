@@ -1,10 +1,12 @@
 package com.example.edutech
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -20,7 +22,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -29,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.edutech.naivgation.AuthService
+import com.example.edutech.ui.theme.EduTechTheme
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.FirebaseApp
@@ -39,62 +41,74 @@ import com.google.android.gms.common.api.ApiException
 import com.google.firebase.auth.AuthCredential
 import kotlinx.coroutines.launch
 
+
 class MainActivity : ComponentActivity() {
-    private lateinit var googleSignInClient: GoogleSignInClient
     private lateinit var auth: FirebaseAuth
+    private lateinit var googleSignInClient: GoogleSignInClient
+    // 1) launcher za rezultat Google Sign-In Intenta
+    private lateinit var googleSignInLauncher: ActivityResultLauncher<Intent>
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize Firebase
         FirebaseApp.initializeApp(this)
-
-        // Initialize FirebaseAuth
         auth = FirebaseAuth.getInstance()
+        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+            .requestIdToken(getString(R.string.default_web_client_id))
+            .requestEmail()
+            .build()
+        googleSignInClient = GoogleSignIn.getClient(this, gso)
 
-        // Set up GoogleSignInOptions
-        val googleSignInOptions = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id)) // Use your web client ID
-            .requestEmail().build()
-
-        googleSignInClient = GoogleSignIn.getClient(this, googleSignInOptions)
-
-        // Set content using Jetpack Compose
-        setContent {
-            AuthenticationScreen(
-                googleSignInClient = googleSignInClient,
-                auth = auth,
-                signInWithGoogle = { signInWithGoogle() })
-        }
-    }
-
-    // Google Sign-In functionality
-    private val googleSignInLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            try {
-                val account = task.getResult(ApiException::class.java)
-                val credential = GoogleAuthProvider.getCredential(account.idToken, null)
-                signInOrRegisterWithGoogle(credential)
-            } catch (e: ApiException) {
-                Toast.makeText(this, "Error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+        // 2) registriraj launcher prije setContent
+        googleSignInLauncher = registerForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) { result ->
+            if (result.resultCode == RESULT_OK) {
+                val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                try {
+                    val account = task.getResult(ApiException::class.java)!!
+                    // kreiraj credential i proslijedi ga u "pravu" funkciju
+                    val credential = GoogleAuthProvider
+                        .getCredential(account.idToken!!, null)
+                    signInOrRegisterWithGoogle(credential)
+                } catch (e: ApiException) {
+                    Toast.makeText(this, "Google sign-in failed: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+                }
             }
         }
 
-    // Function to trigger Google Sign-In
-    private fun signInWithGoogle() {
-        val signInIntent = googleSignInClient.signInIntent
-        googleSignInLauncher.launch(signInIntent)
+        setContent {
+            EduTechTheme {
+                AuthenticationScreen(
+                    googleSignInClient = googleSignInClient,
+                    auth = auth,
+                    signInWithGoogle = { googleSignInLauncher.launch(googleSignInClient.signInIntent) },
+                    onAuthSuccess = {
+                        startActivity(
+                            Intent(this, HomeActivity::class.java)
+                                .apply { flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }
+                        )
+                        finish()
+                    }
+                )
+            }
+        }
     }
 
+    // 4) tvoja "prava" funkcija kojoj se prosljeđuje AuthCredential
     private fun signInOrRegisterWithGoogle(credential: AuthCredential) {
         auth.signInWithCredential(credential).addOnCompleteListener { authTask ->
             if (authTask.isSuccessful) {
-                // Successful login
                 Log.d("GoogleSignIn", "Sign-in successful")
                 Toast.makeText(this, "Google sign-in successful", Toast.LENGTH_SHORT).show()
+                // nakon uspjeha radiš istu navigaciju
+                startActivity(
+                    Intent(this, HomeActivity::class.java).apply {
+                        flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+                    }
+                )
+                finish()
             } else {
-                // Log error details
                 val errorMessage = authTask.exception?.localizedMessage ?: "Unknown error"
                 Log.e("GoogleSignIn", "Sign-in failed: $errorMessage", authTask.exception)
                 Toast.makeText(this, "Google sign-in failed: $errorMessage", Toast.LENGTH_SHORT)
@@ -104,10 +118,11 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AuthenticationScreen(
-    googleSignInClient: GoogleSignInClient, auth: FirebaseAuth, signInWithGoogle: () -> Unit
+    googleSignInClient: GoogleSignInClient, auth: FirebaseAuth, signInWithGoogle: () -> Unit,
+    onAuthSuccess: () -> Unit
 ) {
     var isRegister by remember { mutableStateOf(false) }
     var email by remember { mutableStateOf("") }
@@ -188,6 +203,7 @@ fun AuthenticationScreen(
                                     snackbarHostState.showSnackbar(success)
                                 }
                                 loading = false
+                                onAuthSuccess()
                             })
                         } else {
                             authService.loginUser(email, password, { error ->
@@ -200,6 +216,7 @@ fun AuthenticationScreen(
                                     snackbarHostState.showSnackbar(success)
                                 }
                                 loading = false
+                                onAuthSuccess()
                             })
                         }
                     },
@@ -310,21 +327,22 @@ fun GoogleSignInButton(onClick: () -> Unit) {
 
 @Composable
 fun buildAuthSwitchAnnotatedString(isRegister: Boolean): AnnotatedString {
-    val staticText = if (isRegister) "Already have an account? Login!" else "Don't have an account? Register!"
-    val clickableText = if (isRegister) "Login" else "Register"
-    val colorScheme = MaterialTheme.colorScheme
-
     return buildAnnotatedString {
-        append(staticText)
-        addLink(
-            LinkAnnotation.Clickable(tag = "auth_switch") {
-                append(clickableText)
-            }, start = staticText.length, end = staticText.length + clickableText.length
-        )
+        val text = if (isRegister) "Already have an account? Sign in" else "Don't have an account? Register"
+        append(text)
         addStyle(
-            style = SpanStyle(color = colorScheme.primary),
-            start = staticText.length,
-            end = staticText.length + clickableText.length
+            style = SpanStyle(
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold
+            ),
+            start = text.indexOf(if (isRegister) "Sign in" else "Register"),
+            end = text.length
+        )
+        addStringAnnotation(
+            tag = "auth_switch",
+            annotation = "auth_switch",
+            start = text.indexOf(if (isRegister) "Sign in" else "Register"),
+            end = text.length
         )
     }
 }
